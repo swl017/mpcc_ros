@@ -1,0 +1,11 @@
+# Project specific excludes
+/External/
+/MPCC
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+
+**/.vscode/
