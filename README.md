@@ -7,7 +7,7 @@ cd src/mpcc/
 ```
 2. To run mpcc ros node, must be placed in the following path
 ```
-    cd /src/mpcc/
+cd /src/mpcc/
 ```
 Now run
 
