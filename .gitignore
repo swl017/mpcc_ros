@@ -10,4 +10,4 @@ cmake_install.cmake
 
 **/.vscode/
 
-src/External/
+**/External/
