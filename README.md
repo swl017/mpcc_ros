@@ -1,9 +1,14 @@
 # MPCC in ROS
 
-Must be placed in
+1. First, install dependencies. No sudo required.
 
-    <package-path>/src/mpcc$
+    cd src/mpcc/
+    ./install
 
-and run
+2. To run mpcc ros node, must be placed in the following path
+
+    cd /src/mpcc/
+
+Now run
 
     $ rosrun mpcc_ros mpcc
