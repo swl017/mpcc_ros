@@ -29,10 +29,37 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
+// Euler to Quaternion source: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Source_code_2
+struct Quaternion
+{
+    double w, x, y, z;
+};
+
+Quaternion ToQuaternion(double yaw, double pitch, double roll) // yaw (Z), pitch (Y), roll (X)
+{
+    // Abbreviations for the various angular functions
+    double cy = cos(yaw * 0.5);
+    double sy = sin(yaw * 0.5);
+    double cp = cos(pitch * 0.5);
+    double sp = sin(pitch * 0.5);
+    double cr = cos(roll * 0.5);
+    double sr = sin(roll * 0.5);
+
+    Quaternion q;
+    q.w = cr * cp * cy + sr * sp * sy;
+    q.x = sr * cp * cy - cr * sp * sy;
+    q.y = cr * sp * cy + sr * cp * sy;
+    q.z = cr * cp * sy - sr * sp * cy;
+
+    return q;
+}
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "mpcc");
     ros::NodeHandle nh;
     ros::NodeHandle nhp("~");
+
+    ros::Publisher pose_pub = nh.advertise<nav_msgs::Odometry>("sim_pose", 1);
 
     // using namespace mpcc;
 
@@ -94,6 +121,19 @@ int main(int argc, char** argv) {
         MPCReturn mpc_sol = mpc.runMPC(x0);
         x0 = integrator.simTimeStep(x0,mpc_sol.u0,jsonConfig["Ts"]);
         log.push_back(mpc_sol);
+
+        nav_msgs::Odometry msg;
+        msg.header.stamp = ros::Time::now();
+        msg.header.frame_id = "odom";
+        msg.pose.pose.position.x = x0.X;
+        msg.pose.pose.position.y = x0.Y;
+        Quaternion q;
+        ToQuaternion(x0.phi, 0., 0.);
+        msg.pose.pose.orientation.x = q.x;
+        msg.pose.pose.orientation.y = q.y;
+        msg.pose.pose.orientation.z = q.z;
+        msg.pose.pose.orientation.w = q.w;
+        pose_pub.publish(msg);
     }
     //plotter.plotRun(log,track_xy);
     //plotter.plotSim(log,track_xy);
