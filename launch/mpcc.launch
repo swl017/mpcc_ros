@@ -1,0 +1,6 @@
+<!-- mpcc_ros must be run at (mpcc_ros)/src/mpcc/, never with launch file-->
+<launch>
+    <node pkg="mpcc_ros" type="mpcc" name="mpcc" output="screen">
+        <param name="config_path" type="string" value="$(find mpcc_ros)/src/mpcc/Params/config.json" />
+    </node>
+</launch>

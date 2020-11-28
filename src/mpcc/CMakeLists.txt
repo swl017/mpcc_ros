@@ -22,7 +22,7 @@ include_directories(External/Json/include)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES mpcc_ros
- CATKIN_DEPENDS nav_msgs roscpp rospy sensor_msgs std_msgs tf
+ CATKIN_DEPENDS nav_msgs roscpp rospy sensor_msgs geometry_msgs std_msgs tf
 #  DEPENDS system_lib
 )
 

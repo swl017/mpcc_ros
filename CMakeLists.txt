@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   tf
+  ackermann_msgs
 )
 
 find_package(cmake_modules REQUIRED)
@@ -30,7 +31,7 @@ find_package(catkin REQUIRED)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   #DEPENDS Boost
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs nav_msgs
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs nav_msgs ackermann_msgs
   INCLUDE_DIRS include
 )
 

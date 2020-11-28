@@ -15,46 +15,61 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "mpcc_ros.h"
-
-#include "Tests/spline_test.h"
-#include "Tests/model_integrator_test.h"
-#include "Tests/constratins_test.h"
-#include "Tests/cost_test.h"
-
-#include "MPC/mpc.h"
-#include "Model/integrator.h"
-#include "Params/track.h"
-//#include "Plotting/plotting.h"
-
-#include <nlohmann/json.hpp>
 using json = nlohmann::json;
+
+namespace mpcc
+{
+MpccRos::MpccRos()
+{
+    ros::NodeHandle nh;
+
+    ego_odom_sub_ = nh.subscribe("simulation/bodyOdom", 1, &MpccRos::stateCallback, this);
+    control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("control", 1);
+}
+
+MpccRos::~MpccRos()
+{
+}
+
+void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
+{
+    x_.X     = msg->pose.pose.position.x;
+    x_.Y     = msg->pose.pose.position.y;
+    EulerAngles angles;
+    angles = ToEulerAngles(msg->pose.pose.orientation);
+    x_.phi   = angles.yaw;
+    x_.vx    = msg->twist.twist.linear.x;
+    x_.vy    = msg->twist.twist.linear.y;
+    x_.r     = msg->twist.twist.angular.z;
+    x_.D     += u_.dD;
+    x_.delta += u_.dDelta;
+    x_.vs    = sqrt(x_.vx*x_.vx + x_.vy*x_.vy); //u_.dVs;
+}
+
+void MpccRos::publishControl()
+{
+    ackermann_msgs::AckermannDriveStamped u;
+    u.drive.acceleration   = x_.D;
+    u.drive.steering_angle = x_.delta;
+    u.drive.speed          = x_.vs;
+    control_pub_.publish(u);
+}
+}
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "mpcc");
-    ros::NodeHandle nh;
     ros::NodeHandle nhp("~");
+    using namespace mpcc;
 
-    // using namespace mpcc;
+    MpccRos mpcc_ros_pub_sub;
 
     package_path_ = ros::package::getPath("mpcc_ros");
-    nhp.param("config_path", config_path_, package_path_+"/src/mpcc/Params/config.json");
+    // nhp.param("config_path", config_path_, package_path_+"/src/mpcc/Params/config.json");
+    package_path_ = "/home/sw/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json";
+    nhp.param("config_path", config_path_, package_path_);
     std::cout << "config_path = " << config_path_ << std::endl;
-    using namespace mpcc;
     std::cout << "l01" << std::endl;
     std::ifstream iConfig(config_path_);
-    // std::ifstream iConfig;
-    // iConfig.open("src/mpcc/Params/config.json");
-    // std::cout << "l02" << std::endl;
-    // if(iConfig.is_open())    //파일이 열렸는지 확인
-    // {
-    //     std::cout << "l05" << std::endl;
-    //     char arr[256];
-    //     iConfig.getline(arr, 256);
-    //     std::cout << "arr = " << arr << std::endl;
-    // }
-    // else{
-    //     std::cout << "l06" << std::endl;
-    // }
     json jsonConfig;
     std::cout << "l03" << std::endl;
     iConfig >> jsonConfig;
@@ -68,18 +83,14 @@ int main(int argc, char** argv) {
 
     // std::cout << testSpline() << std::endl;
     // std::cout << testArcLengthSpline(json_paths) << std::endl;
-
     // std::cout << testIntegrator(json_paths) << std::endl;
     // std::cout << testLinModel(json_paths) << std::endl;
-
     // std::cout << testAlphaConstraint(json_paths) << std::endl;
     // std::cout << testTireForceConstraint(json_paths) << std::endl;
     // std::cout << testTrackConstraint(json_paths) << std::endl;
-
     // std::cout << testCost(json_paths) << std::endl;
 
     Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
-    //Plotting plotter = Plotting(jsonConfig["Ts"],json_paths);
 
     Track track = Track(json_paths.track_path);
     TrackPos track_xy = track.getTrack();
@@ -89,15 +100,23 @@ int main(int argc, char** argv) {
     mpc.setTrack(track_xy.X,track_xy.Y);
     const double phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
     State x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
-    for(int i=0;i<jsonConfig["n_sim"];i++)
-    {
-        MPCReturn mpc_sol = mpc.runMPC(x0);
-        x0 = integrator.simTimeStep(x0,mpc_sol.u0,jsonConfig["Ts"]);
-        log.push_back(mpc_sol);
-    }
-    //plotter.plotRun(log,track_xy);
-    //plotter.plotSim(log,track_xy);
+    mpcc_ros_pub_sub.x_ = x0;
 
+    ros::Rate r(50);
+    while(ros::ok())
+    {
+        State x = mpcc_ros_pub_sub.x_;
+        MPCReturn mpc_sol = mpc.runMPC(x);
+        x0 = integrator.simTimeStep(x,mpc_sol.u0,jsonConfig["Ts"]);
+        log.push_back(mpc_sol);
+
+        mpcc_ros_pub_sub.u_ = mpc_sol.u0;
+        mpcc_ros_pub_sub.publishControl();
+        ros::spinOnce();
+        r.sleep();
+    }
+
+    // Performance summary
     double mean_time = 0.0;
     double max_time = 0.0;
     for(MPCReturn log_i : log)
@@ -108,6 +127,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "mean nmpc time " << mean_time/double(jsonConfig["n_sim"]) << std::endl;
     std::cout << "max nmpc time " << max_time << std::endl;
+    
     return 0;
 }
 
