@@ -76,6 +76,7 @@ class MPC {
 public:
     MPCReturn runMPC(State &x0);
 
+    void setVariables(int n_sqp, int n_reset, double sqp_mixing, double Ts,const PathToJson &path);
     void setTrack(const Eigen::VectorXd &X, const Eigen::VectorXd &Y);
 
     MPC();
@@ -113,7 +114,7 @@ private:
     int n_no_solves_sqp_;
     int n_reset_;
 
-    const double Ts_;
+    double Ts_;
 
     Model model_;
     Integrator integrator_;

@@ -25,8 +25,6 @@
 
 #include <ackermann_msgs/AckermannDriveStamped.h>
 
-std::string config_path_;
-std::string package_path_;
 
 // struct Quaternion
 // {
@@ -81,16 +79,37 @@ EulerAngles ToEulerAngles(geometry_msgs::Quaternion q) {
 
 namespace mpcc
 {
+class MPC;
 class MpccRos
 {
 public:
     MpccRos();
     ~MpccRos();
 
+    void mpcInit();
     void stateCallback(const nav_msgs::OdometryConstPtr& msg);
-    void publishControl();
+    void runControlLoop(State x);
+    void publishControl(Input u);
     State x_;
     Input u_;
+    Input u_sig_; // sum of u_
+    std::array<OptVariables,N+1> mpc_horizon_;
+
+    ////////////////////////////////////////
+    /////// MPC class initialization ///////
+    ////////////////////////////////////////
+    std::string config_path_;
+    json jsonConfig;
+    PathToJson json_paths;
+    TrackPos track_xy;
+    std::list<MPCReturn> log;
+    // MPC mpc;
+    double phi_0;
+    State x0;
+    ////////////////////////////////////////////
+    /////// End MPC class initialization ///////
+    ////////////////////////////////////////////
+    
 private:
     ros::Subscriber ego_odom_sub_;
     ros::Publisher control_pub_;

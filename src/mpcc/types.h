@@ -83,11 +83,11 @@ struct Input{
 };
 
 struct PathToJson{
-    const std::string param_path;
-    const std::string cost_path;
-    const std::string bounds_path;
-    const std::string track_path;
-    const std::string normalization_path;
+    std::string param_path;
+    std::string cost_path;
+    std::string bounds_path;
+    std::string track_path;
+    std::string normalization_path;
 };
 
 typedef Eigen::Matrix<double,NX,1> StateVector;

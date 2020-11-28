@@ -43,6 +43,26 @@ track_(ArcLengthSpline(path))
     n_reset_ = n_reset;
 }
 
+void MPC::setVariables(int n_sqp, int n_reset, double sqp_mixing, double Ts,const PathToJson &path)
+{
+    // Ts_ = Ts;
+    // valid_initial_guess_ = false;
+    // HpipmInterface solver_interface_;// = new HpipmInterface();
+    // param_ = Param(path.param_path);
+    // normalization_param_ = NormalizationParam(path.normalization_path);
+    // bounds_ = BoundsParam(path.bounds_path);
+    // constraints_ = Constraints(Ts,path);
+    // cost_ = Cost(path);
+    // integrator_ = Integrator(Ts,path);
+    // model_ = Model(Ts,path);
+    // track_ = ArcLengthSpline(path);
+    // n_sqp_ = n_sqp;
+    // sqp_mixing_ = sqp_mixing;
+    // n_non_solves_ = 0;
+    // n_no_solves_sqp_ = 0;
+    // n_reset_ = n_reset;
+}
+
 void MPC::setMPCProblem()
 {
     for(int i=0;i<=N;i++)
