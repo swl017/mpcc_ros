@@ -25,10 +25,67 @@ MpccRos::MpccRos()
 
     ego_odom_sub_ = nh.subscribe("simulation/bodyOdom", 1, &MpccRos::stateCallback, this);
     control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("control", 1);
+
+    mpcInit();
 }
 
 MpccRos::~MpccRos()
 {
+    // Performance summary
+    double mean_time = 0.0;
+    double max_time = 0.0;
+    for(MPCReturn log_i : log)
+    {
+        mean_time += log_i.time_total;
+        if(log_i.time_total > max_time)
+            max_time = log_i.time_total;
+    }
+    std::cout << "mean nmpc time " << mean_time/double(jsonConfig["n_sim"]) << std::endl;
+    std::cout << "max nmpc time " << max_time << std::endl;
+}
+
+void MpccRos::mpcInit()
+{
+    ////////////////////////////////////////
+    /////// MPC class initialization ///////
+    ////////////////////////////////////////
+
+    config_path_ = "/home/sw/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json";
+    std::cout << "config_path = " << config_path_ << std::endl;
+    std::cout << "l01" << std::endl;
+    std::ifstream iConfig(config_path_);
+    std::cout << "l03" << std::endl;
+    iConfig >> jsonConfig;
+    std::cout << "l04" << std::endl;
+
+    PathToJson json_paths_ {jsonConfig["model_path"],
+                           jsonConfig["cost_path"],
+                           jsonConfig["bounds_path"],
+                           jsonConfig["track_path"],
+                           jsonConfig["normalization_path"]};
+
+    json_paths = json_paths_;
+    std::cout << testSpline() << std::endl;
+    std::cout << testArcLengthSpline(json_paths) << std::endl;
+    std::cout << testIntegrator(json_paths) << std::endl;
+    std::cout << testLinModel(json_paths) << std::endl;
+    std::cout << testAlphaConstraint(json_paths) << std::endl;
+    std::cout << testTireForceConstraint(json_paths) << std::endl;
+    std::cout << testTrackConstraint(json_paths) << std::endl;
+    std::cout << testCost(json_paths) << std::endl;
+
+    Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
+    
+    // mpc.setVariables(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths);
+    // MPC mpc_(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths);
+    // mpc = mpc_;
+    // mpc.setTrack(track_xy.X,track_xy.Y);
+    // phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
+    // x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
+
+    ////////////////////////////////////////////
+    /////// End MPC class initialization ///////
+    ////////////////////////////////////////////
 }
 
 void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
@@ -44,15 +101,36 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
     x_.D     += u_.dD;
     x_.delta += u_.dDelta;
     x_.vs    = sqrt(x_.vx*x_.vx + x_.vy*x_.vy); //u_.dVs;
+
+    runControlLoop(x_);
 }
 
-void MpccRos::publishControl()
+void MpccRos::runControlLoop(State x)
 {
-    ackermann_msgs::AckermannDriveStamped u;
-    u.drive.acceleration   = x_.D;
-    u.drive.steering_angle = x_.delta;
-    u.drive.speed          = x_.vs;
-    control_pub_.publish(u);
+    Track track = Track(json_paths.track_path);
+    TrackPos track_xy = track.getTrack();
+    MPC mpc(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths);
+    mpc.setTrack(track_xy.X,track_xy.Y);
+    phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
+    x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
+
+    MPCReturn mpc_sol = mpc.runMPC(x);
+    u_ = mpc_sol.u0;
+    mpc_horizon_ = mpc_sol.mpc_horizon;
+    publishControl(u_);
+}
+
+void MpccRos::publishControl(Input u)
+{
+    u_sig_.dD     += u.dD;
+    u_sig_.dDelta += u.dDelta;
+    u_sig_.dVs    += u.dVs;
+
+    ackermann_msgs::AckermannDriveStamped msg;
+    msg.drive.acceleration   = u_sig_.dD;
+    msg.drive.steering_angle = u_sig_.dDelta;
+    msg.drive.speed          = u_sig_.dVs;
+    control_pub_.publish(msg);
 }
 }
 
@@ -61,72 +139,23 @@ int main(int argc, char** argv) {
     ros::NodeHandle nhp("~");
     using namespace mpcc;
 
-    MpccRos mpcc_ros_pub_sub;
+    MpccRos mpcc_ros;
 
-    package_path_ = ros::package::getPath("mpcc_ros");
-    // nhp.param("config_path", config_path_, package_path_+"/src/mpcc/Params/config.json");
-    package_path_ = "/home/sw/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json";
-    nhp.param("config_path", config_path_, package_path_);
-    std::cout << "config_path = " << config_path_ << std::endl;
-    std::cout << "l01" << std::endl;
-    std::ifstream iConfig(config_path_);
-    json jsonConfig;
-    std::cout << "l03" << std::endl;
-    iConfig >> jsonConfig;
-    std::cout << "l04" << std::endl;
+    // ros::Rate r(50);
+    // while(ros::ok())
+    // {
+    //     State x = mpcc_ros_pub_sub.x_;
+    //     MPCReturn mpc_sol = mpc.runMPC(x);
+    //     x0 = integrator.simTimeStep(x,mpc_sol.u0,jsonConfig["Ts"]);
+    //     log.push_back(mpc_sol);
 
-    PathToJson json_paths {jsonConfig["model_path"],
-                           jsonConfig["cost_path"],
-                           jsonConfig["bounds_path"],
-                           jsonConfig["track_path"],
-                           jsonConfig["normalization_path"]};
+    //     mpcc_ros_pub_sub.u_ = mpc_sol.u0;
+    //     mpcc_ros_pub_sub.publishControl();
+    //     ros::spinOnce();
+    //     r.sleep();
+    // }
+    ros::spin();
 
-    // std::cout << testSpline() << std::endl;
-    // std::cout << testArcLengthSpline(json_paths) << std::endl;
-    // std::cout << testIntegrator(json_paths) << std::endl;
-    // std::cout << testLinModel(json_paths) << std::endl;
-    // std::cout << testAlphaConstraint(json_paths) << std::endl;
-    // std::cout << testTireForceConstraint(json_paths) << std::endl;
-    // std::cout << testTrackConstraint(json_paths) << std::endl;
-    // std::cout << testCost(json_paths) << std::endl;
-
-    Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
-
-    Track track = Track(json_paths.track_path);
-    TrackPos track_xy = track.getTrack();
-
-    std::list<MPCReturn> log;
-    MPC mpc(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths);
-    mpc.setTrack(track_xy.X,track_xy.Y);
-    const double phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
-    State x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
-    mpcc_ros_pub_sub.x_ = x0;
-
-    ros::Rate r(50);
-    while(ros::ok())
-    {
-        State x = mpcc_ros_pub_sub.x_;
-        MPCReturn mpc_sol = mpc.runMPC(x);
-        x0 = integrator.simTimeStep(x,mpc_sol.u0,jsonConfig["Ts"]);
-        log.push_back(mpc_sol);
-
-        mpcc_ros_pub_sub.u_ = mpc_sol.u0;
-        mpcc_ros_pub_sub.publishControl();
-        ros::spinOnce();
-        r.sleep();
-    }
-
-    // Performance summary
-    double mean_time = 0.0;
-    double max_time = 0.0;
-    for(MPCReturn log_i : log)
-    {
-        mean_time += log_i.time_total;
-        if(log_i.time_total > max_time)
-            max_time = log_i.time_total;
-    }
-    std::cout << "mean nmpc time " << mean_time/double(jsonConfig["n_sim"]) << std::endl;
-    std::cout << "max nmpc time " << max_time << std::endl;
     
     return 0;
 }
