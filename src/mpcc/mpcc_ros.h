@@ -84,6 +84,7 @@ class MpccRos
 {
 public:
     MpccRos();
+    MpccRos(int n_sqp, int n_reset,double sqp_mixing, double Ts,const PathToJson path, json config);
     ~MpccRos();
 
     void mpcInit();
@@ -106,6 +107,8 @@ public:
     // MPC mpc;
     double phi_0;
     State x0;
+
+    MPC mpc;
     ////////////////////////////////////////////
     /////// End MPC class initialization ///////
     ////////////////////////////////////////////

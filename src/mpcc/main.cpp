@@ -28,6 +28,18 @@ MpccRos::MpccRos()
 
     mpcInit();
 }
+MpccRos::MpccRos(int n_sqp, int n_reset,double sqp_mixing, double Ts,const PathToJson path, json config):
+mpc(n_sqp, n_reset, sqp_mixing, Ts, path),
+json_paths(path),
+jsonConfig(config)
+{
+    ros::NodeHandle nh;
+
+    ego_odom_sub_ = nh.subscribe("simulation/bodyOdom", 1, &MpccRos::stateCallback, this);
+    control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("control", 1);
+
+    mpcInit();
+}
 
 MpccRos::~MpccRos()
 {
@@ -50,38 +62,11 @@ void MpccRos::mpcInit()
     /////// MPC class initialization ///////
     ////////////////////////////////////////
 
-    config_path_ = "/home/sw/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json";
-    std::cout << "config_path = " << config_path_ << std::endl;
-    std::cout << "l01" << std::endl;
-    std::ifstream iConfig(config_path_);
-    std::cout << "l03" << std::endl;
-    iConfig >> jsonConfig;
-    std::cout << "l04" << std::endl;
-
-    PathToJson json_paths_ {jsonConfig["model_path"],
-                           jsonConfig["cost_path"],
-                           jsonConfig["bounds_path"],
-                           jsonConfig["track_path"],
-                           jsonConfig["normalization_path"]};
-
-    json_paths = json_paths_;
-    std::cout << testSpline() << std::endl;
-    std::cout << testArcLengthSpline(json_paths) << std::endl;
-    std::cout << testIntegrator(json_paths) << std::endl;
-    std::cout << testLinModel(json_paths) << std::endl;
-    std::cout << testAlphaConstraint(json_paths) << std::endl;
-    std::cout << testTireForceConstraint(json_paths) << std::endl;
-    std::cout << testTrackConstraint(json_paths) << std::endl;
-    std::cout << testCost(json_paths) << std::endl;
-
-    Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
-    
-    // mpc.setVariables(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths);
-    // MPC mpc_(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths);
-    // mpc = mpc_;
-    // mpc.setTrack(track_xy.X,track_xy.Y);
-    // phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
-    // x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
+    Track track = Track(json_paths.track_path);
+    TrackPos track_xy = track.getTrack();
+    mpc.setTrack(track_xy.X,track_xy.Y);
+    phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
+    x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
 
     ////////////////////////////////////////////
     /////// End MPC class initialization ///////
@@ -107,16 +92,10 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
 
 void MpccRos::runControlLoop(State x)
 {
-    Track track = Track(json_paths.track_path);
-    TrackPos track_xy = track.getTrack();
-    MPC mpc(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths);
-    mpc.setTrack(track_xy.X,track_xy.Y);
-    phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
-    x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
-
     MPCReturn mpc_sol = mpc.runMPC(x);
     u_ = mpc_sol.u0;
     mpc_horizon_ = mpc_sol.mpc_horizon;
+    log.push_back(mpc_sol);
     publishControl(u_);
 }
 
@@ -138,8 +117,35 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "mpcc");
     ros::NodeHandle nhp("~");
     using namespace mpcc;
+    std::ifstream iConfig("/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json");
+    json jsonConfig;
+    iConfig >> jsonConfig;
 
-    MpccRos mpcc_ros;
+    PathToJson json_paths {jsonConfig["model_path"],
+                           jsonConfig["cost_path"],
+                           jsonConfig["bounds_path"],
+                           jsonConfig["track_path"],
+                           jsonConfig["normalization_path"]};
+
+    // std::cout << testSpline() << std::endl;
+    // std::cout << testArcLengthSpline(json_paths) << std::endl;
+
+    // std::cout << testIntegrator(json_paths) << std::endl;
+    // std::cout << testLinModel(json_paths) << std::endl;
+
+    // std::cout << testAlphaConstraint(json_paths) << std::endl;
+    // std::cout << testTireForceConstraint(json_paths) << std::endl;
+    // std::cout << testTrackConstraint(json_paths) << std::endl;
+
+    // std::cout << testCost(json_paths) << std::endl;
+
+    Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
+    //Plotting plotter = Plotting(jsonConfig["Ts"],json_paths);
+
+    Track track = Track(json_paths.track_path);
+    TrackPos track_xy = track.getTrack();
+
+    MpccRos mpcc_ros(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"],jsonConfig["Ts"],json_paths, jsonConfig);
 
     // ros::Rate r(50);
     // while(ros::ok())
