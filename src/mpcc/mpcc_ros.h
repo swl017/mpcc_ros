@@ -14,7 +14,9 @@
 #include "ros/ros.h"
 #include <ros/package.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <geometry_msgs/Quaternion.h>
+#include <geometry_msgs/PoseStamped.h>
 
 #include <std_msgs/Float64.h>
 #include <std_msgs/Float64.h>
@@ -79,7 +81,6 @@ EulerAngles ToEulerAngles(geometry_msgs::Quaternion q) {
 
 namespace mpcc
 {
-class MPC;
 class MpccRos
 {
 public:
@@ -91,6 +92,7 @@ public:
     void stateCallback(const nav_msgs::OdometryConstPtr& msg);
     void runControlLoop(State x);
     void publishControl(Input u);
+    void publishTrack();
     State x_;
     Input u_;
     Input u_sig_; // sum of u_
@@ -112,10 +114,19 @@ public:
     ////////////////////////////////////////////
     /////// End MPC class initialization ///////
     ////////////////////////////////////////////
+    nav_msgs::Path center_path_;
+    nav_msgs::Path bound_in_;
+    nav_msgs::Path bound_out_;
+    nav_msgs::Path sol_trajectory_;
     
 private:
     ros::Subscriber ego_odom_sub_;
     ros::Publisher control_pub_;
+    ros::Publisher path_pub_;
+    ros::Publisher bound_in_pub_;
+    ros::Publisher bound_out_pub_;
+
+    ros::Publisher sol_trajectory_pub_;
 
     nav_msgs::Odometry ego_odom_;
 
