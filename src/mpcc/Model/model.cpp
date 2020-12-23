@@ -51,14 +51,15 @@ TireForces Model::getForceFront(const State &x) const
 TireForces Model::getForceRear(const State &x) const
 {
     double Cm1;
-    if(x.D >= 0)
-    {
-        Cm1 = param_.Cm1;
-    }
-    else
-    {
-        Cm1 = param_.Cm1_brake;
-    }
+    // if(x.D >= 0)
+    // {
+    //     Cm1 = param_.Cm1;
+    // }
+    // else
+    // {
+    //     Cm1 = param_.Cm1_brake;
+    // }
+    Cm1 = param_.Cm1;
     
     const double alpha_r = getSlipAngleRear(x);
     const double F_y = param_.Dr * std::sin(param_.Cr * std::atan(param_.Br * alpha_r ));
@@ -113,14 +114,15 @@ TireForcesDerivatives Model::getForceFrontDerivatives(const State &x) const
 TireForcesDerivatives Model::getForceRearDerivatives(const State &x) const
 {
     double Cm1;
-    if(x.D >= 0)
-    {
-        Cm1 = param_.Cm1;
-    }
-    else
-    {
-        Cm1 = param_.Cm1_brake;
-    }
+    // if(x.D >= 0)
+    // {
+    //     Cm1 = param_.Cm1;
+    // }
+    // else
+    // {
+    //     Cm1 = param_.Cm1_brake;
+    // }
+    Cm1 = param_.Cm1;
     const double alpha_r = getSlipAngleRear(x);
     const double vx = x.vx;
     const double vy = x.vy;

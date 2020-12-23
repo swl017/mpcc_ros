@@ -34,6 +34,7 @@ json_paths(path),
 jsonConfig(config)
 {
     ros::NodeHandle nh;
+    use_test_sim_ = true;
 
     ego_odom_sub_ = nh.subscribe("simulation/bodyOdom", 1, &MpccRos::stateCallback, this);
     control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("control", 1);
@@ -42,6 +43,8 @@ jsonConfig(config)
     bound_in_pub_  = nh.advertise<nav_msgs::Path>("path/bound_in", 1);
     bound_out_pub_ = nh.advertise<nav_msgs::Path>("path/bound_out", 1);
     sol_trajectory_pub_ = nh.advertise<nav_msgs::Path>("path/solution_trajectory", 1);
+
+    pose_pub = nh.advertise<nav_msgs::Odometry>("sim_pose", 1);
 
     mpcInit();
 }
@@ -110,6 +113,10 @@ void MpccRos::mpcInit()
 
         bound_out_.poses.push_back(pose);
     }
+    if(use_test_sim_)
+    {
+        runTestSim();
+    }
 }
 
 void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
@@ -127,6 +134,8 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
     x_.vs    = sqrt(x_.vx*x_.vx + x_.vy*x_.vy); //u_.dVs;
 
     runControlLoop(x_);
+    publishControl(u_);
+    publishTrack();
 }
 
 void MpccRos::runControlLoop(State x)
@@ -135,8 +144,6 @@ void MpccRos::runControlLoop(State x)
     u_ = mpc_sol.u0;
     mpc_horizon_ = mpc_sol.mpc_horizon;
     log.push_back(mpc_sol);
-    publishControl(u_);
-    publishTrack();
 }
 
 void MpccRos::publishControl(Input u)
@@ -170,6 +177,37 @@ void MpccRos::publishTrack()
     path_pub_.publish(center_path_);
     bound_in_pub_.publish(bound_in_);
     bound_out_pub_ .publish(bound_out_);
+}
+
+void MpccRos::runTestSim()
+{
+    Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
+    for(int i=0;i<jsonConfig["n_sim"];i++)
+    {
+        MPCReturn mpc_sol = mpc.runMPC(x0);
+        u_ = mpc_sol.u0;
+        mpc_horizon_ = mpc_sol.mpc_horizon;
+        log.push_back(mpc_sol);
+        x0 = integrator.simTimeStep(x0,mpc_sol.u0,jsonConfig["Ts"]);
+        x_ = x0;
+
+        nav_msgs::Odometry msg;
+        msg.header.seq = i;
+        msg.header.stamp = ros::Time::now();
+        msg.header.frame_id = "odom";
+        msg.pose.pose.position.x = x0.X;
+        msg.pose.pose.position.y = x0.Y;
+        geometry_msgs::Quaternion q;
+        q = ToQuaternion(x0.phi, 0., 0.);
+        msg.pose.pose.orientation.x = q.x;
+        msg.pose.pose.orientation.y = q.y;
+        msg.pose.pose.orientation.z = q.z;
+        msg.pose.pose.orientation.w = q.w;
+        pose_pub.publish(msg);
+
+        publishControl(u_);
+        publishTrack();
+    }
 }
 }
 

@@ -1,15 +1,15 @@
 
 {
-  "n_sqp": 2,
-  "n_reset": 5,
+  "n_sqp": 5,
+  "n_reset": 10,
   "sqp_mixing" : 0.8,
   "n_sim": 600,
   "Ts": 0.02,
-  "v0": 0.2,
+  "v0": 40,
   
-  "model_path": "Params/model.json",
+  "model_path": "Params/model_iac.json",
   "cost_path": "Params/cost.json",
-  "bounds_path": "Params/bounds.json",
-  "track_path": "Params/track.json",
+  "bounds_path": "Params/bounds_1_scale.json",
+  "track_path": "Params/track_1_scale.json",
   "normalization_path": "Params/normalization.json"
 }

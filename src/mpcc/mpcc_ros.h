@@ -91,6 +91,7 @@ public:
     void mpcInit();
     void stateCallback(const nav_msgs::OdometryConstPtr& msg);
     void runControlLoop(State x);
+    void runTestSim();
     void publishControl(Input u);
     void publishTrack();
     State x_;
@@ -125,10 +126,31 @@ private:
     ros::Publisher path_pub_;
     ros::Publisher bound_in_pub_;
     ros::Publisher bound_out_pub_;
+    ros::Publisher pose_pub;
 
     ros::Publisher sol_trajectory_pub_;
 
     nav_msgs::Odometry ego_odom_;
 
+    bool use_test_sim_;
+
+    geometry_msgs::Quaternion ToQuaternion(double yaw, double pitch, double roll) // yaw (Z), pitch (Y), roll (X)
+    {
+    // Abbreviations for the various angular functions
+    double cy = cos(yaw * 0.5);
+    double sy = sin(yaw * 0.5);
+    double cp = cos(pitch * 0.5);
+    double sp = sin(pitch * 0.5);
+    double cr = cos(roll * 0.5);
+    double sr = sin(roll * 0.5);
+
+    geometry_msgs::Quaternion q;
+    q.w = cr * cp * cy + sr * sp * sy;
+    q.x = sr * cp * cy - cr * sp * sy;
+    q.y = cr * sp * cy + sr * cp * sy;
+    q.z = cr * cp * sy - sr * sp * cy;
+
+    return q;
+    }
 };
 }
