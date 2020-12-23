@@ -146,9 +146,10 @@ void MpccRos::publishControl(Input u)
     u_sig_.dVs    += u.dVs;
 
     ackermann_msgs::AckermannDriveStamped msg;
-    msg.drive.acceleration   = u.dD;//u_sig_.dD;
-    msg.drive.steering_angle = u.dDelta;//u_sig_.dDelta;
-    msg.drive.speed          = u.dVs;
+
+    msg.drive.acceleration   = x_.D;
+    msg.drive.steering_angle = x_.delta;
+    msg.drive.speed          = x_.vs;
     control_pub_.publish(msg);
 
     sol_trajectory_.poses.clear();
@@ -176,7 +177,7 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "mpcc");
     ros::NodeHandle nhp("~");
     using namespace mpcc;
-    std::ifstream iConfig("/home/sw/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json");
+    std::ifstream iConfig("/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json");
     json jsonConfig;
     iConfig >> jsonConfig;
 

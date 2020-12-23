@@ -31,6 +31,7 @@ using json = nlohmann::json;
 class Param{
 public:
     double Cm1;
+    double Cm1_brake;
     double Cm2;
     double Cr0;
     double Cr2;

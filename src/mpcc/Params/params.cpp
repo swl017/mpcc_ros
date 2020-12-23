@@ -32,6 +32,7 @@ Param::Param(std::string file){
     iModel >> jsonModel;
     // Model Parameters
     Cm1 	= jsonModel["Cm1"];
+    Cm1_brake = jsonModel["Cm1_brake"];
     Cm2 	= jsonModel["Cm2"];
 
     Cr0 	= jsonModel["Cr0"];
