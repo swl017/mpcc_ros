@@ -20,7 +20,6 @@
 #include "config.h"
 #include "types.h"
 #include "Params/params.h"
-
 namespace mpcc{
 //Return
 struct LinModelMatrix {
@@ -77,13 +76,13 @@ public:
 
     StateVector getF(const State &x,const Input &u) const;
 
-    LinModelMatrix getLinModel(const State &x, const Input &u,const State &x_next) const;
+    LinModelMatrix getLinModel(const State &x, const Input &u) const;
 
     Model();
     Model(double Ts,const PathToJson &path);
 private:
     LinModelMatrix getModelJacobian(const State &x, const Input &u) const;
-    LinModelMatrix discretizeModel(const LinModelMatrix &lin_model_c,const State &x, const Input &u,const State &x_next) const;
+    LinModelMatrix discretizeModel(const LinModelMatrix &lin_model_c) const;
 
     Param param_;
     const double Ts_;

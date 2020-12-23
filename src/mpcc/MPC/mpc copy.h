@@ -76,6 +76,7 @@ class MPC {
 public:
     MPCReturn runMPC(State &x0);
 
+    void setVariables(int n_sqp, int n_reset, double sqp_mixing, double Ts,const PathToJson &path);
     void setTrack(const Eigen::VectorXd &X, const Eigen::VectorXd &Y);
 
     MPC();
@@ -91,7 +92,7 @@ private:
 
     void setMPCProblem();
 
-    void setStage(const State &xk, const Input &uk,const State &xk1, int time_step);
+    void setStage(const State &xk, const Input &uk, int time_step);
 
     CostMatrix normalizeCost(const CostMatrix &cost_mat);
     LinModelMatrix normalizeDynamics(const LinModelMatrix &lin_model);
@@ -113,7 +114,7 @@ private:
     int n_no_solves_sqp_;
     int n_reset_;
 
-    const double Ts_;
+    double Ts_;
 
     Model model_;
     Integrator integrator_;

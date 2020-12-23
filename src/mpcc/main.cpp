@@ -184,29 +184,32 @@ void MpccRos::runTestSim()
     Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
     for(int i=0;i<jsonConfig["n_sim"];i++)
     {
-        MPCReturn mpc_sol = mpc.runMPC(x0);
-        u_ = mpc_sol.u0;
-        mpc_horizon_ = mpc_sol.mpc_horizon;
-        log.push_back(mpc_sol);
-        x0 = integrator.simTimeStep(x0,mpc_sol.u0,jsonConfig["Ts"]);
-        x_ = x0;
+        if(ros::ok())
+        {
+            MPCReturn mpc_sol = mpc.runMPC(x0);
+            u_ = mpc_sol.u0;
+            mpc_horizon_ = mpc_sol.mpc_horizon;
+            log.push_back(mpc_sol);
+            x0 = integrator.simTimeStep(x0,mpc_sol.u0,jsonConfig["Ts"]);
+            x_ = x0;
 
-        nav_msgs::Odometry msg;
-        msg.header.seq = i;
-        msg.header.stamp = ros::Time::now();
-        msg.header.frame_id = "odom";
-        msg.pose.pose.position.x = x0.X;
-        msg.pose.pose.position.y = x0.Y;
-        geometry_msgs::Quaternion q;
-        q = ToQuaternion(x0.phi, 0., 0.);
-        msg.pose.pose.orientation.x = q.x;
-        msg.pose.pose.orientation.y = q.y;
-        msg.pose.pose.orientation.z = q.z;
-        msg.pose.pose.orientation.w = q.w;
-        pose_pub.publish(msg);
+            nav_msgs::Odometry msg;
+            msg.header.seq = i;
+            msg.header.stamp = ros::Time::now();
+            msg.header.frame_id = "odom";
+            msg.pose.pose.position.x = x0.X;
+            msg.pose.pose.position.y = x0.Y;
+            geometry_msgs::Quaternion q;
+            q = ToQuaternion(x0.phi, 0., 0.);
+            msg.pose.pose.orientation.x = q.x;
+            msg.pose.pose.orientation.y = q.y;
+            msg.pose.pose.orientation.z = q.z;
+            msg.pose.pose.orientation.w = q.w;
+            pose_pub.publish(msg);
 
-        publishControl(u_);
-        publishTrack();
+            publishControl(u_);
+            publishTrack();
+        }
     }
 }
 }

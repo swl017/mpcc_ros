@@ -60,10 +60,6 @@ add_executable(mpcc
         Cost/cost.cpp
         Model/model.cpp
         Model/integrator.cpp
-        Tests/spline_test.cpp
-        Tests/cost_test.cpp
-        Tests/model_integrator_test.cpp
-        Tests/constratins_test.cpp
         MPC/mpc.cpp
         Params/track.cpp
         Params/track.h
