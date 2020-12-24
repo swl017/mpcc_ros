@@ -133,6 +133,7 @@ private:
     nav_msgs::Odometry ego_odom_;
 
     bool use_test_sim_;
+    double Ts_;
 
     geometry_msgs::Quaternion ToQuaternion(double yaw, double pitch, double roll) // yaw (Z), pitch (Y), roll (X)
     {

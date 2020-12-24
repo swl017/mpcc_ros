@@ -35,6 +35,7 @@ jsonConfig(config)
 {
     ros::NodeHandle nh;
     use_test_sim_ = true;
+    Ts_ = jsonConfig["Ts"];
 
     ego_odom_sub_ = nh.subscribe("simulation/bodyOdom", 1, &MpccRos::stateCallback, this);
     control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("control", 1);
@@ -129,8 +130,8 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
     x_.vx    = msg->twist.twist.linear.x;
     x_.vy    = msg->twist.twist.linear.y;
     x_.r     = std::min(8., std::max(-8., msg->twist.twist.angular.z));
-    x_.D     = std::min(1., std::max(-0.1, x_.D+u_.dD));
-    x_.delta = std::min(0.35, std::max(-0.35, x_.delta+u_.dDelta));
+    x_.D     = std::min(1., std::max(-1., x_.D+u_.dD*Ts_));
+    x_.delta = std::min(0.35, std::max(-0.35, x_.delta+u_.dDelta*Ts_));
     x_.vs    = sqrt(x_.vx*x_.vx + x_.vy*x_.vy); //u_.dVs;
 
     runControlLoop(x_);
@@ -197,6 +198,7 @@ void MpccRos::runTestSim()
             msg.header.seq = i;
             msg.header.stamp = ros::Time::now();
             msg.header.frame_id = "odom";
+            msg.child_frame_id = "base_link";
             msg.pose.pose.position.x = x0.X;
             msg.pose.pose.position.y = x0.Y;
             geometry_msgs::Quaternion q;
