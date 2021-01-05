@@ -90,6 +90,10 @@ public:
 
     void mpcInit();
     void stateCallback(const nav_msgs::OdometryConstPtr& msg);
+    void referencePathCallback(const nav_msgs::PathConstPtr& msg);
+    void trackBoundLeftCallback(const nav_msgs::PathConstPtr& msg);
+    void trackBoundRightCallback(const nav_msgs::PathConstPtr& msg);
+
     void runControlLoop(State x);
     void runTestSim();
     void publishControl(Input u);
@@ -115,6 +119,8 @@ public:
     ////////////////////////////////////////////
     /////// End MPC class initialization ///////
     ////////////////////////////////////////////
+
+    // All path topics in global frame
     nav_msgs::Path center_path_;
     nav_msgs::Path bound_in_;
     nav_msgs::Path bound_out_;
@@ -122,6 +128,10 @@ public:
     
 private:
     ros::Subscriber ego_odom_sub_;
+    ros::Subscriber reference_path_sub_;
+    ros::Subscriber track_boundary_left_sub_;
+    ros::Subscriber track_boundary_right_sub_;
+
     ros::Publisher control_pub_;
     ros::Publisher path_pub_;
     ros::Publisher bound_in_pub_;
@@ -133,6 +143,9 @@ private:
     nav_msgs::Odometry ego_odom_;
 
     bool use_test_sim_;
+    bool b_rcv_reference_path_;
+    bool b_rcv_track_boundary_left_;
+    bool b_rcv_track_boundary_right_;
     double Ts_;
 
     geometry_msgs::Quaternion ToQuaternion(double yaw, double pitch, double roll) // yaw (Z), pitch (Y), roll (X)

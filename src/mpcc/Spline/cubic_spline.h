@@ -46,6 +46,7 @@ public:
     double getSecondDerivative(double x) const;
 
     CubicSpline();
+    SplineData spline_data_;
 private:
     bool data_set_;
 
@@ -56,7 +57,6 @@ private:
     double unwrapInput(double x) const;
 
     SplineParams spline_params_;
-    SplineData spline_data_;
 };
 }
 #endif //MPCC_CUBIC_SPLINE_H

@@ -38,12 +38,16 @@ jsonConfig(config)
     Ts_ = jsonConfig["Ts"];
 
     ego_odom_sub_ = nh.subscribe("simulation/bodyOdom", 1, &MpccRos::stateCallback, this);
-    control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("control", 1);
+    reference_path_sub_ = nh.subscribe("reference_path", 1, &MpccRos::referencePathCallback, this);
+    track_boundary_left_sub_ = nh.subscribe("track_boundary_left", 1, &MpccRos::trackBoundLeftCallback, this);
+    track_boundary_right_sub_ = nh.subscribe("track_boundary_right", 1, &MpccRos::trackBoundRightCallback, this);
+    
+    control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("mpc_control", 1);
 
-    path_pub_      = nh.advertise<nav_msgs::Path>("path/center_line", 1);
-    bound_in_pub_  = nh.advertise<nav_msgs::Path>("path/bound_in", 1);
-    bound_out_pub_ = nh.advertise<nav_msgs::Path>("path/bound_out", 1);
-    sol_trajectory_pub_ = nh.advertise<nav_msgs::Path>("path/solution_trajectory", 1);
+    path_pub_      = nh.advertise<nav_msgs::Path>("path/mpc_center_line", 1);
+    bound_in_pub_  = nh.advertise<nav_msgs::Path>("path/mpc_bound_in", 1);
+    bound_out_pub_ = nh.advertise<nav_msgs::Path>("path/mpc_bound_out", 1);
+    sol_trajectory_pub_ = nh.advertise<nav_msgs::Path>("path/mpc_solution_trajectory", 1);
 
     pose_pub = nh.advertise<nav_msgs::Odometry>("sim_pose", 1);
 
@@ -120,6 +124,45 @@ void MpccRos::mpcInit()
     }
 }
 
+void MpccRos::referencePathCallback(const nav_msgs::PathConstPtr& msg)
+{
+    b_rcv_reference_path_ = true;
+    center_path_.poses.clear();
+    for(int i = 0; i < msg->poses.size(); i++)
+    {
+        geometry_msgs::PoseStamped pose;
+        pose.pose.position.x = msg->poses[i].pose.position.x;
+        pose.pose.position.y = msg->poses[i].pose.position.y;
+        center_path_.poses.push_back(pose);
+    }
+}
+
+void MpccRos::trackBoundLeftCallback(const nav_msgs::PathConstPtr& msg)
+{
+    b_rcv_track_boundary_left_ = true;
+    bound_in_.poses.clear();
+    for(int i = 0; i < msg->poses.size(); i++)
+    {
+        geometry_msgs::PoseStamped pose;
+        pose.pose.position.x = msg->poses[i].pose.position.x;
+        pose.pose.position.y = msg->poses[i].pose.position.y;
+        bound_in_.poses.push_back(pose);
+    }
+}
+
+void MpccRos::trackBoundRightCallback(const nav_msgs::PathConstPtr& msg)
+{
+    b_rcv_track_boundary_right_ = true;
+    bound_out_.poses.clear();
+    for(int i = 0; i < msg->poses.size(); i++)
+    {
+        geometry_msgs::PoseStamped pose;
+        pose.pose.position.x = msg->poses[i].pose.position.x;
+        pose.pose.position.y = msg->poses[i].pose.position.y;
+        bound_out_.poses.push_back(pose);
+    }
+}
+
 void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
 {
     x_.X     = msg->pose.pose.position.x;
@@ -130,9 +173,46 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
     x_.vx    = msg->twist.twist.linear.x;
     x_.vy    = msg->twist.twist.linear.y;
     x_.r     = std::min(8., std::max(-8., msg->twist.twist.angular.z));
+    // TODO: Check if we can get vehicle steer/throttle state(position)
     x_.D     = std::min(1., std::max(-1., x_.D+u_.dD*Ts_));
     x_.delta = std::min(0.35, std::max(-0.35, x_.delta+u_.dDelta*Ts_));
     x_.vs    = sqrt(x_.vx*x_.vx + x_.vy*x_.vy); //u_.dVs;
+
+    int raceline_length = center_path_.poses.size();
+    int boundary_in_length = bound_in_.poses.size();
+    int boundary_out_length = bound_out_.poses.size();
+    // RCLCPP_INFO(rclcpp::get_logger("mpcc_controller"), "MPC Planner received: c %d, in %d, out %d",
+    //         raceline_length, boundary_in_length, boundary_out_length);
+
+    if(raceline_length > 20 && boundary_in_length > 20 && boundary_out_length  > 20
+        && b_rcv_reference_path_ && b_rcv_track_boundary_left_ && b_rcv_track_boundary_right_)
+    {
+        Eigen::VectorXd raceline_X(raceline_length);
+        Eigen::VectorXd raceline_Y(raceline_length);
+        for (int i=0; i<raceline_length; i++)
+        {
+            raceline_X(i) = center_path_.poses[i].pose.position.x;
+            raceline_Y(i) = center_path_.poses[i].pose.position.y;
+        }
+
+        Eigen::VectorXd boundary_in_X(boundary_in_length);
+        Eigen::VectorXd boundary_in_Y(boundary_in_length);
+        for (int i=0; i<boundary_in_length; i++)
+        {
+            boundary_in_X(i) = bound_in_.poses[i].pose.position.x;
+            boundary_in_Y(i) = bound_in_.poses[i].pose.position.y;
+        }
+
+        Eigen::VectorXd boundary_out_X(boundary_out_length);
+        Eigen::VectorXd boundary_out_Y(boundary_out_length);
+        for (int i=0; i<boundary_out_length; i++)
+        {
+            boundary_out_X(i) = bound_out_.poses[i].pose.position.x;
+            boundary_out_Y(i) = bound_out_.poses[i].pose.position.y;
+        }
+
+        mpc.setTrack(raceline_X, raceline_Y, boundary_in_X, boundary_in_Y, boundary_out_X, boundary_out_Y);
+    }
 
     runControlLoop(x_);
     publishControl(u_);
@@ -155,6 +235,7 @@ void MpccRos::publishControl(Input u)
 
     ackermann_msgs::AckermannDriveStamped msg;
 
+    // TODO: Need debate
     msg.drive.acceleration   = x_.D;
     msg.drive.steering_angle = x_.delta;
     msg.drive.speed          = x_.vs;

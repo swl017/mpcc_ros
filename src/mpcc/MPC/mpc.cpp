@@ -34,7 +34,9 @@ constraints_(Constraints(Ts,path)),
 cost_(Cost(path)),
 integrator_(Integrator(Ts,path)),
 model_(Model(Ts,path)),
-track_(ArcLengthSpline(path))
+track_(ArcLengthSpline(path)),
+track_i(ArcLengthSpline(path)),
+track_o(ArcLengthSpline(path))
 {
     n_sqp_ = n_sqp;
     sqp_mixing_ = sqp_mixing;
@@ -45,9 +47,13 @@ track_(ArcLengthSpline(path))
 
 void MPC::setMPCProblem()
 {
+    pos_outer_.clear();
+    pos_inner_.clear();
     for(int i=0;i<=N;i++)
     {
         setStage(initial_guess_[i].xk,initial_guess_[i].uk,initial_guess_[i+1].xk,i);
+        pos_outer_.push_back(constraints_.pos_outer_xy_);
+        pos_inner_.push_back(constraints_.pos_inner_xy_);
     }
 }
 
@@ -75,7 +81,8 @@ void MPC::setStage(const State &xk, const Input &uk, const State &xk1, const int
 
     stages_[time_step].cost_mat = normalizeCost(cost_.getCost(track_,xk_nz,uk,time_step));
     stages_[time_step].lin_model = normalizeDynamics(model_.getLinModel(xk_nz,uk,xk1_nz));
-    stages_[time_step].constrains_mat = normalizeCon(constraints_.getConstraints(track_,xk_nz,uk));
+    // stages_[time_step].constrains_mat = normalizeCon(constraints_.getConstraints(track_,xk_nz,uk));
+    stages_[time_step].constrains_mat = normalizeCon(constraints_.getConstraints(track_,track_i,track_o,xk_nz,uk));
 
     stages_[time_step].l_bounds_x = normalization_param_.T_x_inv*bounds_.getBoundsLX(xk_nz);
     stages_[time_step].u_bounds_x = normalization_param_.T_x_inv*bounds_.getBoundsUX(xk_nz);
@@ -264,6 +271,13 @@ MPCReturn MPC::runMPC(State &x0)
 void MPC::setTrack(const Eigen::VectorXd &X, const Eigen::VectorXd &Y){
     track_.gen2DSpline(X,Y);
 }
-
+void MPC::setTrack(const Eigen::VectorXd &X, const Eigen::VectorXd &Y,
+                    const Eigen::VectorXd &X_i, const Eigen::VectorXd &Y_i, 
+                    const Eigen::VectorXd &X_o, const Eigen::VectorXd &Y_o)
+{
+    track_.gen2DSpline(X,Y);
+    track_i.gen2DSpline(X_i,Y_i);
+    track_o.gen2DSpline(X_o,Y_o);
+}
 
 }

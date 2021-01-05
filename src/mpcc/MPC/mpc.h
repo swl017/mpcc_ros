@@ -77,9 +77,16 @@ public:
     MPCReturn runMPC(State &x0);
 
     void setTrack(const Eigen::VectorXd &X, const Eigen::VectorXd &Y);
+    void setTrack(
+        const Eigen::VectorXd &X, const Eigen::VectorXd &Y,
+        const Eigen::VectorXd &X_inner, const Eigen::VectorXd &Y_inner,
+        const Eigen::VectorXd &X_outer, const Eigen::VectorXd &Y_outer);
 
     MPC();
     MPC(int n_sqp, int n_reset, double sqp_mixing, double Ts,const PathToJson &path);
+    Constraints constraints_;
+    std::vector<std::vector<double>> pos_outer_;
+    std::vector<std::vector<double>> pos_inner_;
 
 private:
     bool valid_initial_guess_;
@@ -118,8 +125,9 @@ private:
     Model model_;
     Integrator integrator_;
     Cost cost_;
-    Constraints constraints_;
     ArcLengthSpline track_;
+    ArcLengthSpline track_i;
+    ArcLengthSpline track_o;
 
     Bounds bounds_;
     NormalizationParam normalization_param_;

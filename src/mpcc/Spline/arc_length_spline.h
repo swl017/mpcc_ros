@@ -41,6 +41,8 @@ public:
     // X and Y spline used for final spline fit
     void gen2DSpline(const Eigen::VectorXd &X,const Eigen::VectorXd &Y);
     Eigen::Vector2d getPostion(double) const;
+    Eigen::Vector2d getPostion(double, double) const;
+    Eigen::Vector2d getClosestPostion(const State x, const ArcLengthSpline &track) const;
     Eigen::Vector2d getDerivative(double) const;
     Eigen::Vector2d getSecondDerivative(double) const;
     double getLength() const;
@@ -49,6 +51,8 @@ public:
     ArcLengthSpline();
     ArcLengthSpline(const PathToJson &path);
     // void setParam(const Param &param) { param_ = param; };
+    CubicSpline spline_x_;
+    CubicSpline spline_y_;
 
 private:
     void setData(const Eigen::VectorXd &X_in,const Eigen::VectorXd &Y_in);
@@ -61,8 +65,6 @@ private:
 
     PathData path_data_;      // initial data and data used for successive fitting
 //    PathData pathDataFinal; // final data
-    CubicSpline spline_x_;
-    CubicSpline spline_y_;
     Param param_;
 };
 }

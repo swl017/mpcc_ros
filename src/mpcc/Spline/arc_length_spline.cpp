@@ -228,6 +228,7 @@ void ArcLengthSpline::gen2DSpline(const Eigen::VectorXd &X,const Eigen::VectorXd
     clean_path = outlierRemoval(X,Y);
     // successively fit spline and re-sample
     fitSpline(clean_path.X,clean_path.Y);
+    setData(X,Y);
 
 }
 
@@ -239,6 +240,26 @@ Eigen::Vector2d ArcLengthSpline::getPostion(const double s) const
     s_path(1) = spline_y_.getPoint(s);
 
     return s_path;
+}
+
+Eigen::Vector2d ArcLengthSpline::getClosestPostion(const State x, const ArcLengthSpline &track) const
+{
+    Eigen::Vector2d pos;
+    double closest_dist_sq = 9999.*9999.;
+    for(int i = 0; i<track.spline_x_.spline_data_.n_points; i++)
+    {
+        double track_x = track.spline_x_.spline_data_.x_data(i);
+        double track_y = track.spline_y_.spline_data_.y_data(i);
+        double dist_sq = pow(track_x-x.X, 2.) + pow(track_y-x.Y, 2.);
+        if(closest_dist_sq > dist_sq)
+        {
+            pos(0) = track_x;
+            pos(1) = track_y;
+            closest_dist_sq = dist_sq;
+        }
+    }
+
+    return pos;
 }
 
 Eigen::Vector2d ArcLengthSpline::getDerivative(const double s) const
@@ -275,6 +296,8 @@ double ArcLengthSpline::porjectOnSpline(const State &x) const
     double s_opt = s_guess;
     double dist = (pos-pos_path).norm();
 
+    // std::cout << "pos x, y : " << pos(0) << " " << pos(1) << " " << "pos_path x, y : " << pos_path(0) << " " << pos_path(1) << std::endl;
+
     if (dist >= param_.max_dist_proj)
     {
         std::cout << "dist too large" << std::endl;
@@ -301,9 +324,15 @@ double ArcLengthSpline::porjectOnSpline(const State &x) const
 
 //        std::cout << std::abs(s_old - s_opt) << std::endl;
         if(std::abs(s_old - s_opt) <= 1e-5)
+        {
+            // std::cout << "curr s : " << x.s << " " << "s_opt : " << s_opt << " " << "s_guess : " << s_guess << std::endl;
             return s_opt;
+        }
         s_old = s_opt;
     }
+
+    // std::cout << "curr s : " << x.s << " " << "s_opt : " << s_opt << " " << "s_guess : " << s_guess << std::endl;
+
     // something is strange if it did not converge within 20 iterations, give back the initial guess
     return s_guess;
 }

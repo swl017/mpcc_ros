@@ -54,6 +54,53 @@ OneDConstraint Constraints::getTrackConstraints(const ArcLengthSpline &track,con
     return {C_track_constraint,track_constraint_lower,track_constraint_upper};
 }
 
+// sw: Implementating R_out and R_in dependent on s
+OneDConstraint Constraints::getTrackConstraints(const ArcLengthSpline &track,const ArcLengthSpline &track_i,const ArcLengthSpline &track_o,const State &x)
+{
+    // given arc length s and the track -> compute linearized track constraints
+    const double s = x.s;
+
+    // X-Y point of the center line
+    const Eigen::Vector2d pos_center = track.getPostion(s);
+    const Eigen::Vector2d d_center   = track.getDerivative(s);
+    // Tangent of center line at s
+    const Eigen::Vector2d tan_center = {-d_center(1),d_center(0)};
+
+    ////////////// Making r_in and r_out dependent on s /////////////
+    const Eigen::Vector2d pos_track_out = track_o.getClosestPostion(x, track_o);
+    const Eigen::Vector2d pos_track_in = track_i.getClosestPostion(x, track_i);
+
+    double r_in = abs((pos_track_in - pos_center).dot(tan_center));// - 0.6*param_.car_w/2.;
+    double r_out = abs((pos_track_out - pos_center).dot(tan_center));// - 0.6*param_.car_w/2.;
+
+    double obs_test = 1.;
+    double obs_test1 = 1.;
+    if ((x.s > 550. && x.s < 700.)){
+//	    obs_test = -0.5;
+    }
+    if (x.s > 1400. && x.s < 1600.)
+    {
+//	    obs_test1 = -0.5;
+    }
+    const Eigen::Vector2d pos_outer = pos_center + obs_test1*r_in*tan_center;
+    const Eigen::Vector2d pos_inner = pos_center - obs_test*r_out*tan_center; // inner and outer is flipped in MPC problem
+
+    //const Eigen::Vector2d pos_outer = pos_center + param_.r_out*tan_center;
+    //const Eigen::Vector2d pos_inner = pos_center - param_.r_in*tan_center;
+    pos_outer_xy_ = {pos_outer(0), pos_outer(1)};
+    pos_inner_xy_ = {pos_inner(0), pos_inner(1)};
+
+    // Define track Jacobian as Perpendicular vector
+    C_i_MPC C_track_constraint = C_i_MPC::Zero();
+    C_track_constraint(0,0) = tan_center(0);
+    C_track_constraint(0,1) = tan_center(1);
+    // Compute bounds
+    const double track_constraint_lower = tan_center(0)*pos_inner(0) + tan_center(1)*pos_inner(1);
+    const double track_constraint_upper = tan_center(0)*pos_outer(0) + tan_center(1)*pos_outer(1);
+
+    return {C_track_constraint,track_constraint_lower,track_constraint_upper};
+}
+
 OneDConstraint Constraints::getTireConstraintRear(const State &x) const
 {
     // compute tire friction elipse constraints
@@ -163,6 +210,41 @@ ConstrainsMatrix Constraints::getConstraints(const ArcLengthSpline &track,const 
 
     ConstrainsMatrix constrains_matrix;
     const OneDConstraint track_constraints = getTrackConstraints(track,x);
+    const OneDConstraint tire_constraints_rear = getTireConstraintRear(x);
+    const OneDConstraint alpha_constraints_front = getAlphaConstraintFront(x);
+
+    C_MPC C_constrains_matrix;
+    d_MPC dl_constrains_matrix;
+    d_MPC du_constrains_matrix;
+
+    C_constrains_matrix.row(si_index.con_track) = track_constraints.C_i;
+    dl_constrains_matrix(si_index.con_track) = track_constraints.dl_i;
+    du_constrains_matrix(si_index.con_track) = track_constraints.du_i;
+
+    C_constrains_matrix.row(si_index.con_tire) = tire_constraints_rear.C_i;
+    dl_constrains_matrix(si_index.con_tire) = tire_constraints_rear.dl_i;
+    du_constrains_matrix(si_index.con_tire) = tire_constraints_rear.du_i;
+
+    C_constrains_matrix.row(si_index.con_alpha) = alpha_constraints_front.C_i;
+    dl_constrains_matrix(si_index.con_alpha) = alpha_constraints_front.dl_i;
+    du_constrains_matrix(si_index.con_alpha) = alpha_constraints_front.du_i;
+
+    // TODO consider the zero order term directly in the functions construdcing the constraints
+    dl_constrains_matrix = dl_constrains_matrix -  C_constrains_matrix*stateToVector(x);   
+    du_constrains_matrix = du_constrains_matrix -  C_constrains_matrix*stateToVector(x);   
+
+    return {C_constrains_matrix,D_MPC::Zero(),dl_constrains_matrix,du_constrains_matrix};
+}
+
+// sw: TODO implementation
+ConstrainsMatrix Constraints::getConstraints(const ArcLengthSpline &track,const ArcLengthSpline &track_i,const ArcLengthSpline &track_o,const State &x,const Input &u)
+{
+    // compute all the polytopic state constraints
+    // compute the three constraints
+
+    ConstrainsMatrix constrains_matrix;
+    // const OneDConstraint track_constraints = getTrackConstraints(track,x);
+    OneDConstraint track_constraints = getTrackConstraints(track,track_i,track_o,x);
     const OneDConstraint tire_constraints_rear = getTireConstraintRear(x);
     const OneDConstraint alpha_constraints_front = getAlphaConstraintFront(x);
 

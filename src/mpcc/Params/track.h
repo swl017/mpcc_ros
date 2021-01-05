@@ -54,6 +54,6 @@ private:
     Eigen::VectorXd X_outer;
     Eigen::VectorXd Y_outer;
 };
-};
+}
 
 #endif //MPCC_TRACK_H

@@ -38,11 +38,17 @@ struct OneDConstraint {
 class Constraints {
 public:
     ConstrainsMatrix getConstraints(const ArcLengthSpline &track,const State &x,const Input &u) const;
+    ConstrainsMatrix getConstraints(const ArcLengthSpline &track,const ArcLengthSpline &track_i,const ArcLengthSpline &track_o,const State &x,const Input &u);
 
     Constraints();
     Constraints(double Ts,const PathToJson &path);
+
+    std::vector<double> pos_outer_xy_;
+    std::vector<double> pos_inner_xy_;
+
 private:
     OneDConstraint getTrackConstraints(const ArcLengthSpline &track,const State &x) const;
+    OneDConstraint getTrackConstraints(const ArcLengthSpline &track,const ArcLengthSpline &track_i,const ArcLengthSpline &track_o,const State &x);
 
     OneDConstraint getTireConstraintRear(const State &x) const;
     C_i_MPC getTireConstraintRearJac(const State &x) const;
