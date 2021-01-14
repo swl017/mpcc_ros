@@ -53,6 +53,7 @@ public:
     // void setParam(const Param &param) { param_ = param; };
     CubicSpline spline_x_;
     CubicSpline spline_y_;
+    PathData path_data_;      // initial data and data used for successive fitting
 
 private:
     void setData(const Eigen::VectorXd &X_in,const Eigen::VectorXd &Y_in);
@@ -63,7 +64,6 @@ private:
     void fitSpline(const Eigen::VectorXd &X,const Eigen::VectorXd &Y);
     double unwrapInput(double x) const;
 
-    PathData path_data_;      // initial data and data used for successive fitting
 //    PathData pathDataFinal; // final data
     Param param_;
 };

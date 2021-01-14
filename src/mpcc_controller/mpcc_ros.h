@@ -98,6 +98,8 @@ public:
     void runTestSim();
     void publishControl(Input u);
     void publishTrack();
+
+    void toGlobalPosition(geometry_msgs::Pose ego_pose, geometry_msgs::Point local_path_point, geometry_msgs::Point& global_path_point);
     State x_;
     Input u_;
     Input u_sig_; // sum of u_

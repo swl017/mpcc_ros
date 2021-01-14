@@ -1,3 +1,11 @@
+# mpcc_controller
+
+A library module of MPCC for both [ROS1](https://github.com/swl017/mpcc_ros) and [ROS2](https://github.com/swl017/mpcc_ros2)
+
+--------------------
+--------------------
+
+
 # MPCC
 This is a C++ implementation of the MPCC controller. The implementation is NOT the version which was used in the paper [Optimization‐based autonomous racing of 1:43 scale RC cars](https://onlinelibrary.wiley.com/doi/abs/10.1002/oca.2123) but a new version with some additional features inspired the work we did in this paper [AMZ Driverless: The Full Autonomous Racing System](https://arxiv.org/abs/1905.05150)
 

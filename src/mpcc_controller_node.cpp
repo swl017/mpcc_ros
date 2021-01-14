@@ -34,13 +34,13 @@ json_paths(path),
 jsonConfig(config)
 {
     ros::NodeHandle nh;
-    use_test_sim_ = true;
+    use_test_sim_ = false;
     Ts_ = jsonConfig["Ts"];
 
-    ego_odom_sub_ = nh.subscribe("simulation/bodyOdom", 1, &MpccRos::stateCallback, this);
-    reference_path_sub_ = nh.subscribe("reference_path", 1, &MpccRos::referencePathCallback, this);
-    track_boundary_left_sub_ = nh.subscribe("track_boundary_left", 1, &MpccRos::trackBoundLeftCallback, this);
-    track_boundary_right_sub_ = nh.subscribe("track_boundary_right", 1, &MpccRos::trackBoundRightCallback, this);
+    ego_odom_sub_ = nh.subscribe("/Odometry/ekf_estimated", 1, &MpccRos::stateCallback, this);
+    reference_path_sub_ = nh.subscribe("/Path/LocalWaypoint/OnBody", 1, &MpccRos::referencePathCallback, this);
+    track_boundary_left_sub_ = nh.subscribe("/mpc/left_boundary", 1, &MpccRos::trackBoundLeftCallback, this);
+    track_boundary_right_sub_ = nh.subscribe("/mpc/right_boundary", 1, &MpccRos::trackBoundRightCallback, this);
     
     control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("mpc_control", 1);
 
@@ -122,6 +122,7 @@ void MpccRos::mpcInit()
     {
         runTestSim();
     }
+
 }
 
 void MpccRos::referencePathCallback(const nav_msgs::PathConstPtr& msg)
@@ -191,36 +192,72 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
         Eigen::VectorXd raceline_Y(raceline_length);
         for (int i=0; i<raceline_length; i++)
         {
-            raceline_X(i) = center_path_.poses[i].pose.position.x;
-            raceline_Y(i) = center_path_.poses[i].pose.position.y;
+            geometry_msgs::Point global_point;
+            toGlobalPosition(ego_odom_.pose.pose, center_path_.poses[i].pose.position, global_point);
+            // raceline_X(i) = center_path_.poses[i].pose.position.x;
+            // raceline_Y(i) = center_path_.poses[i].pose.position.y;
+            raceline_X(i) = global_point.x;
+            raceline_Y(i) = global_point.y;
         }
+        std::cout << "raceline_X " << raceline_X.size() << " raceline_Y " << raceline_Y.size() << " / " << raceline_length << std::endl;
 
         Eigen::VectorXd boundary_in_X(boundary_in_length);
         Eigen::VectorXd boundary_in_Y(boundary_in_length);
         for (int i=0; i<boundary_in_length; i++)
         {
-            boundary_in_X(i) = bound_in_.poses[i].pose.position.x;
-            boundary_in_Y(i) = bound_in_.poses[i].pose.position.y;
+            geometry_msgs::Point global_point;
+            toGlobalPosition(ego_odom_.pose.pose, bound_in_.poses[i].pose.position, global_point);
+            // boundary_in_X(i) = bound_in_.poses[i].pose.position.x;
+            // boundary_in_Y(i) = bound_in_.poses[i].pose.position.y;
+            boundary_in_X(i) = global_point.x;
+            boundary_in_Y(i) = global_point.y;
         }
+        std::cout << "boundary_in_X " << boundary_in_X.size() << " boundary_in_X " << boundary_in_X.size() << " / " << boundary_in_length << std::endl;
 
         Eigen::VectorXd boundary_out_X(boundary_out_length);
         Eigen::VectorXd boundary_out_Y(boundary_out_length);
         for (int i=0; i<boundary_out_length; i++)
         {
-            boundary_out_X(i) = bound_out_.poses[i].pose.position.x;
-            boundary_out_Y(i) = bound_out_.poses[i].pose.position.y;
+            geometry_msgs::Point global_point;
+            toGlobalPosition(ego_odom_.pose.pose, bound_in_.poses[i].pose.position, global_point);
+            // boundary_out_X(i) = bound_out_.poses[i].pose.position.x;
+            // boundary_out_Y(i) = bound_out_.poses[i].pose.position.y;
+            boundary_out_X(i) = global_point.x;
+            boundary_out_Y(i) = global_point.y;
         }
-
+        std::cout << "boundary_out_X " << boundary_out_X.size() << " boundary_out_X " << boundary_out_X.size() << " / " << boundary_out_length << std::endl;
         mpc.setTrack(raceline_X, raceline_Y, boundary_in_X, boundary_in_Y, boundary_out_X, boundary_out_Y);
-    }
-
     runControlLoop(x_);
     publishControl(u_);
     publishTrack();
+    b_rcv_reference_path_ = false;
+    b_rcv_track_boundary_left_ = false;
+    b_rcv_track_boundary_right_ = false;
+    }
+
+}
+
+void MpccRos::toGlobalPosition(geometry_msgs::Pose ego_pose, geometry_msgs::Point local_path_point, geometry_msgs::Point& global_path_point)
+{
+    /**
+     * Path Transform
+     * [global_path, 1]^T = [Rot, Trans; 0(dim), 1] * [local_path, 1]^T
+     * [local_path,  1]^T = [Rot^T, -Rot^T*Trans; 0(dim), 1] * [global_path, 1]^T
+     **/
+    EulerAngles angles;
+    angles = ToEulerAngles(ego_pose.orientation);
+    double yaw = angles.yaw;
+
+    geometry_msgs::PoseStamped pose;
+    pose.pose.position.x = cos(yaw)*local_path_point.x - sin(yaw)*local_path_point.y + ego_pose.position.x;
+    pose.pose.position.y = sin(yaw)*local_path_point.y + cos(yaw)*local_path_point.y + ego_pose.position.y;
+
+    global_path_point = pose.pose.position;
 }
 
 void MpccRos::runControlLoop(State x)
 {
+        std::cout << "DEBUG RUN" << std::endl;
     MPCReturn mpc_sol = mpc.runMPC(x);
     u_ = mpc_sol.u0;
     mpc_horizon_ = mpc_sol.mpc_horizon;
@@ -229,6 +266,7 @@ void MpccRos::runControlLoop(State x)
 
 void MpccRos::publishControl(Input u)
 {
+        std::cout << "DEBUG CON" << std::endl;
     u_sig_.dD     += u.dD;
     u_sig_.dDelta += u.dDelta;
     u_sig_.dVs    += u.dVs;
@@ -243,7 +281,7 @@ void MpccRos::publishControl(Input u)
 
     sol_trajectory_.poses.clear();
     std::cout << "MPC horizon size: " << mpc_horizon_.size() << std::endl;
-    for(int i=0; i<mpc_horizon_.size(); i++)
+    for(int i=0; i<N; i++)
     {
         geometry_msgs::PoseStamped pose;
         pose.pose.position.x = mpc_horizon_.at(i).xk.X;
@@ -256,6 +294,7 @@ void MpccRos::publishControl(Input u)
 
 void MpccRos::publishTrack()
 {
+        std::cout << "DEBUG Track" << std::endl;
     path_pub_.publish(center_path_);
     bound_in_pub_.publish(bound_in_);
     bound_out_pub_ .publish(bound_out_);
@@ -301,7 +340,10 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "mpcc");
     ros::NodeHandle nhp("~");
     using namespace mpcc;
-    std::ifstream iConfig("/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json");
+    std::string config_path;
+    nhp.param("config_path", config_path, std::string("/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json"));
+    std::cout << "Openning config at " << config_path << std::endl;
+    std::ifstream iConfig(config_path.c_str());
     json jsonConfig;
     iConfig >> jsonConfig;
 

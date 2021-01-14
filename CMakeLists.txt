@@ -46,7 +46,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_subdirectory(src/mpcc)
+add_subdirectory(src)
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
