@@ -56,7 +56,7 @@ include_directories(
 
 add_executable(mpcc_controller_node
   mpcc_controller_node.cpp
-  mpcc_controller/mpcc_ros.h
+  mpcc_controller/mpcc_controller_node.h
   mpcc_controller/types.cpp
   mpcc_controller/types.h
   mpcc_controller/config.h

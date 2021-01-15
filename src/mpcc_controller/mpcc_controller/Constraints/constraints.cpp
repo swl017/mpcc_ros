@@ -28,7 +28,7 @@ namespace mpcc
     {
     }
 
-    OneDConstraint Constraints::getTrackConstraints(const ArcLengthSpline &track, const State &x) const
+    OneDConstraint Constraints::getTrackConstraints(const ArcLengthSpline &track, const State &x)
     {
         // given arc length s and the track -> compute linearized track constraints
         const double s = x.s;
@@ -43,6 +43,8 @@ namespace mpcc
         // TODO make R_out and R_in dependent on s
         const Eigen::Vector2d pos_outer = pos_center + param_.r_out * tan_center;
         const Eigen::Vector2d pos_inner = pos_center - param_.r_in * tan_center;
+        pos_outer_xy_ = {pos_outer(0), pos_outer(1)};
+        pos_inner_xy_ = {pos_inner(0), pos_inner(1)};
 
         // Define track Jacobian as Perpendicular vector
         C_i_MPC C_track_constraint = C_i_MPC::Zero();
@@ -75,6 +77,8 @@ namespace mpcc
         double r_out = ((pos_track_out - pos_center).dot(tan_center)) + param_.car_w * 1.2;
         // double r_in = abs((pos_track_in - pos_center).dot(tan_center)) - param_.car_w * 1.2;
         // double r_out = abs((pos_track_out - pos_center).dot(tan_center)) - param_.car_w * 1.2;
+        // double r_in = 1.2;
+        // double r_out = -1.2;
 
         double obs_test = 1.;
         double obs_test1 = 1.;
@@ -209,13 +213,13 @@ namespace mpcc
         return Jac_alphaCon;
     }
 
-    ConstrainsMatrix Constraints::getConstraints(const ArcLengthSpline &track, const State &x, const Input &u) const
+    ConstrainsMatrix Constraints::getConstraints(const ArcLengthSpline &track, const State &x, const Input &u)
     {
         // compute all the polytopic state constraints
         // compute the three constraints
 
         ConstrainsMatrix constrains_matrix;
-        const OneDConstraint track_constraints = getTrackConstraints(track, x);
+        OneDConstraint track_constraints = getTrackConstraints(track, x);
         const OneDConstraint tire_constraints_rear = getTireConstraintRear(x);
         const OneDConstraint alpha_constraints_front = getAlphaConstraintFront(x);
 

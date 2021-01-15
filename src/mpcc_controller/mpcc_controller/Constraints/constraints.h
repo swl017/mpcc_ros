@@ -37,7 +37,7 @@ struct OneDConstraint {
 
 class Constraints {
 public:
-    ConstrainsMatrix getConstraints(const ArcLengthSpline &track,const State &x,const Input &u) const;
+    ConstrainsMatrix getConstraints(const ArcLengthSpline &track,const State &x,const Input &u);
     ConstrainsMatrix getConstraints(const ArcLengthSpline &track,const ArcLengthSpline &track_i,const ArcLengthSpline &track_o,const State &x,const Input &u);
 
     Constraints();
@@ -47,7 +47,7 @@ public:
     std::vector<double> pos_inner_xy_;
 
 private:
-    OneDConstraint getTrackConstraints(const ArcLengthSpline &track,const State &x) const;
+    OneDConstraint getTrackConstraints(const ArcLengthSpline &track,const State &x);
     OneDConstraint getTrackConstraints(const ArcLengthSpline &track,const ArcLengthSpline &track_i,const ArcLengthSpline &track_o,const State &x);
 
     OneDConstraint getTireConstraintRear(const State &x) const;

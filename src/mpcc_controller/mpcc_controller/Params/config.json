@@ -1,0 +1,15 @@
+
+{
+  "n_sqp": 2,
+  "n_reset": 5,
+  "sqp_mixing" : 0.9,
+  "n_sim": 60000,
+  "Ts": 0.025,
+  "v0": 5.2,
+  
+  "model_path": "/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/model_iac.json",
+  "cost_path": "/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/cost_iac.json",
+  "bounds_path": "/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/bounds_iac.json",
+  "track_path": "/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/track_iac.json",
+  "normalization_path": "/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/normalization_iac.json"
+}

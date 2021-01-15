@@ -14,7 +14,7 @@
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
-#include "mpcc_ros.h"
+#include "mpcc_controller_node.h"
 using json = nlohmann::json;
 
 namespace mpcc
@@ -34,8 +34,14 @@ json_paths(path),
 jsonConfig(config)
 {
     ros::NodeHandle nh;
-    use_test_sim_ = false;
+    ros::NodeHandle nhp("~");
+    // use_test_sim_ = false;
     Ts_ = jsonConfig["Ts"];
+
+    nhp.param("use_test_sim", use_test_sim_, false);
+    nhp.param<std::string>("ego_pose_topic", ego_pose_topic_, "sim_pose");
+
+    ROS_INFO("use_sim: %s",use_test_sim_ ? "true" : "false");
 
     ego_odom_sub_ = nh.subscribe("/Odometry/ekf_estimated", 1, &MpccRos::stateCallback, this);
     reference_path_sub_ = nh.subscribe("/Path/LocalWaypoint/OnBody", 1, &MpccRos::referencePathCallback, this);
@@ -44,12 +50,15 @@ jsonConfig(config)
     
     control_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("mpc_control", 1);
 
-    path_pub_      = nh.advertise<nav_msgs::Path>("path/mpc_center_line", 1);
-    bound_in_pub_  = nh.advertise<nav_msgs::Path>("path/mpc_bound_in", 1);
-    bound_out_pub_ = nh.advertise<nav_msgs::Path>("path/mpc_bound_out", 1);
-    sol_trajectory_pub_ = nh.advertise<nav_msgs::Path>("path/mpc_solution_trajectory", 1);
+    path_pub_ = nh.advertise<nav_msgs::Path>("mpc/mpc_center_line", 1);
+    bound_in_pub_ = nh.advertise<nav_msgs::Path>("mpc/bound_in", 1);
+    bound_out_pub_ = nh.advertise<nav_msgs::Path>("mpc/bound_out", 1);
+    mpc_bound_in_pub_ = nh.advertise<nav_msgs::Path>("mpc/mpc_bound_in", 1);
+    mpc_bound_out_pub_ = nh.advertise<nav_msgs::Path>("mpc/mpc_bound_out", 1);
 
-    pose_pub = nh.advertise<nav_msgs::Odometry>("sim_pose", 1);
+    sol_trajectory_pub_ = nh.advertise<nav_msgs::Path>("mpc/mpc_solution_trajectory", 1);
+
+    pose_pub = nh.advertise<nav_msgs::Odometry>(ego_pose_topic_.c_str(), 1);
 
     mpcInit();
 }
@@ -77,7 +86,8 @@ void MpccRos::mpcInit()
 
     Track track = Track(json_paths.track_path);
     TrackPos track_xy = track.getTrack();
-    mpc.setTrack(track_xy.X,track_xy.Y);
+    // mpc.setTrack(track_xy.X,track_xy.Y);
+    mpc.setTrack(track_xy.X,track_xy.Y,track_xy.X_inner,track_xy.Y_inner,track_xy.X_outer,track_xy.Y_outer);
     phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
     x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
     
@@ -93,6 +103,8 @@ void MpccRos::mpcInit()
     center_path_.header.frame_id = frame_id;
     bound_in_.header.frame_id    = frame_id;
     bound_out_.header.frame_id   = frame_id;
+    mpc_bound_in_.header.frame_id   = frame_id;
+    mpc_bound_out_.header.frame_id  = frame_id;
     sol_trajectory_.header.frame_id = frame_id;
     for(int i=0; i<track_xy.X.size(); i++)
     {
@@ -120,6 +132,7 @@ void MpccRos::mpcInit()
     }
     if(use_test_sim_)
     {
+        publishTrack();
         runTestSim();
     }
 
@@ -132,8 +145,9 @@ void MpccRos::referencePathCallback(const nav_msgs::PathConstPtr& msg)
     for(int i = 0; i < msg->poses.size(); i++)
     {
         geometry_msgs::PoseStamped pose;
-        pose.pose.position.x = msg->poses[i].pose.position.x;
-        pose.pose.position.y = msg->poses[i].pose.position.y;
+        // pose.pose.position.x = msg->poses[i].pose.position.x;
+        // pose.pose.position.y = msg->poses[i].pose.position.y;
+        toGlobalPath(msg->poses[i].pose.position, pose.pose.position);
         center_path_.poses.push_back(pose);
     }
 }
@@ -145,8 +159,10 @@ void MpccRos::trackBoundLeftCallback(const nav_msgs::PathConstPtr& msg)
     for(int i = 0; i < msg->poses.size(); i++)
     {
         geometry_msgs::PoseStamped pose;
-        pose.pose.position.x = msg->poses[i].pose.position.x;
-        pose.pose.position.y = msg->poses[i].pose.position.y;
+        // pose.pose.position.x = msg->poses[i].pose.position.x;
+        // pose.pose.position.y = msg->poses[i].pose.position.y;
+        // toGlobalPath(bound_in.poses[i].pose.position, pose.pose.position);
+        toGlobalPath(msg->poses[i].pose.position, pose.pose.position);
         bound_in_.poses.push_back(pose);
     }
 }
@@ -158,9 +174,65 @@ void MpccRos::trackBoundRightCallback(const nav_msgs::PathConstPtr& msg)
     for(int i = 0; i < msg->poses.size(); i++)
     {
         geometry_msgs::PoseStamped pose;
-        pose.pose.position.x = msg->poses[i].pose.position.x;
-        pose.pose.position.y = msg->poses[i].pose.position.y;
+        // pose.pose.position.x = msg->poses[i].pose.position.x;
+        // pose.pose.position.y = msg->poses[i].pose.position.y;
+        // toGlobalPath(bound_out.poses[i].pose.position, pose.pose.position);
+        toGlobalPath(msg->poses[i].pose.position, pose.pose.position);
         bound_out_.poses.push_back(pose);
+    }
+}
+
+void MpccRos::toGlobalPath(geometry_msgs::Point local_position, geometry_msgs::Point &global_position)
+{
+    /**
+     * To global path:
+     * [g_x, g_y, 1]^T = [Rot(yaw_o), Trans(x_o,y_o); 0(dim), 1] * [l_x, l_y, 1]^T
+     * 
+     * To local path:
+     * [l_x, l_y, 1]^T = [Rot(yaw_o)^T, -Rot(yaw_o)^T*Trans(x_o,y_o); 0(dim), 1] * [g_x, g_y, 1]^T
+     * 
+     **/
+    double l_x = local_position.x, l_y = local_position.y;
+    double x_o = x_.X, y_o = x_.Y, yaw_o = x_.phi;
+
+    double g_x = cos(yaw_o) * l_x - sin(yaw_o) * l_y + x_o;
+    double g_y = sin(yaw_o) * l_x + cos(yaw_o) * l_y + y_o;
+
+    global_position.x = g_x;
+    global_position.y = g_y;
+}
+
+void MpccRos::filterBoundary(const nav_msgs::PathConstPtr &raw_path, nav_msgs::Path &filtered_path)
+{
+    int temp_index = 0;
+    int path_length = raw_path->poses.size();
+    if(path_length > 0)
+    {
+        double boundary_jump_thres = 2.0; // meter
+        double last_x = raw_path->poses.at(0).pose.position.x;
+        double last_y = raw_path->poses.at(0).pose.position.y;
+
+        filtered_path.poses.clear();
+
+        for (int i = 1; i < path_length; i++)
+        {
+            double curr_x = raw_path->poses.at(i).pose.position.x;
+            double curr_y = raw_path->poses.at(i).pose.position.y;
+            double dist = sqrt((curr_x - last_x) * (curr_x - last_x) + (curr_y - last_y) * (curr_y - last_y));
+            if (dist < boundary_jump_thres || i - temp_index > 5 && i < 5)
+            {
+                geometry_msgs::PoseStamped pose;
+                pose.pose.position.x = curr_x;
+                pose.pose.position.y = curr_y;
+                filtered_path.poses.push_back(pose);
+                temp_index = i;
+            }
+            else
+            {
+            }
+            last_x = curr_x;
+            last_y = curr_y;
+        }
     }
 }
 
@@ -178,6 +250,7 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
     x_.D     = std::min(1., std::max(-1., x_.D+u_.dD*Ts_));
     x_.delta = std::min(0.35, std::max(-0.35, x_.delta+u_.dDelta*Ts_));
     x_.vs    = sqrt(x_.vx*x_.vx + x_.vy*x_.vy); //u_.dVs;
+    // x_.s     = 0.0;
 
     int raceline_length = center_path_.poses.size();
     int boundary_in_length = bound_in_.poses.size();
@@ -193,7 +266,7 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
         for (int i=0; i<raceline_length; i++)
         {
             geometry_msgs::Point global_point;
-            toGlobalPosition(ego_odom_.pose.pose, center_path_.poses[i].pose.position, global_point);
+            toGlobalPath(center_path_.poses[i].pose.position, global_point);
             // raceline_X(i) = center_path_.poses[i].pose.position.x;
             // raceline_Y(i) = center_path_.poses[i].pose.position.y;
             raceline_X(i) = global_point.x;
@@ -206,7 +279,7 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
         for (int i=0; i<boundary_in_length; i++)
         {
             geometry_msgs::Point global_point;
-            toGlobalPosition(ego_odom_.pose.pose, bound_in_.poses[i].pose.position, global_point);
+            toGlobalPath(bound_in_.poses[i].pose.position, global_point);
             // boundary_in_X(i) = bound_in_.poses[i].pose.position.x;
             // boundary_in_Y(i) = bound_in_.poses[i].pose.position.y;
             boundary_in_X(i) = global_point.x;
@@ -226,10 +299,12 @@ void MpccRos::stateCallback(const nav_msgs::OdometryConstPtr& msg)
             boundary_out_Y(i) = global_point.y;
         }
         std::cout << "boundary_out_X " << boundary_out_X.size() << " boundary_out_X " << boundary_out_X.size() << " / " << boundary_out_length << std::endl;
+        // mpc.setTrack(raceline_X, raceline_Y);
         mpc.setTrack(raceline_X, raceline_Y, boundary_in_X, boundary_in_Y, boundary_out_X, boundary_out_Y);
     runControlLoop(x_);
     publishControl(u_);
     publishTrack();
+    debugSolution();
     b_rcv_reference_path_ = false;
     b_rcv_track_boundary_left_ = false;
     b_rcv_track_boundary_right_ = false;
@@ -272,13 +347,37 @@ void MpccRos::publishControl(Input u)
     u_sig_.dVs    += u.dVs;
 
     ackermann_msgs::AckermannDriveStamped msg;
-
+    msg.header.stamp = ros::Time::now();
     // TODO: Need debate
     msg.drive.acceleration   = x_.D;
     msg.drive.steering_angle = x_.delta;
-    msg.drive.speed          = x_.vs;
+    msg.drive.steering_angle_velocity = u.dDelta;
+    msg.drive.speed          = sqrt(pow(x_.vx, 2.0)+pow(x_.vy, 2.0));
     control_pub_.publish(msg);
 
+}
+
+void MpccRos::debugSolution()
+{
+    mpc_bound_in_.poses.clear();
+    mpc_bound_out_.poses.clear();
+    if(mpc.pos_inner_.size() > 5)
+    {
+        for (int i = 0; i < N; i++)
+        {
+            geometry_msgs::PoseStamped pose_in;
+            pose_in.pose.position.x = mpc.pos_inner_[i][0];
+            pose_in.pose.position.y = mpc.pos_inner_[i][1];
+            mpc_bound_in_.poses.push_back(pose_in);
+
+            geometry_msgs::PoseStamped pose_out;
+            pose_out.pose.position.x = mpc.pos_outer_[i][0];
+            pose_out.pose.position.y = mpc.pos_outer_[i][1];
+            mpc_bound_out_.poses.push_back(pose_out);
+        }
+    }
+    mpc_bound_in_pub_.publish(mpc_bound_in_);
+    mpc_bound_out_pub_.publish(mpc_bound_out_);
     sol_trajectory_.poses.clear();
     std::cout << "MPC horizon size: " << mpc_horizon_.size() << std::endl;
     for(int i=0; i<N; i++)
@@ -294,7 +393,7 @@ void MpccRos::publishControl(Input u)
 
 void MpccRos::publishTrack()
 {
-        std::cout << "DEBUG Track" << std::endl;
+    std::cout << "DEBUG Track" << std::endl;
     path_pub_.publish(center_path_);
     bound_in_pub_.publish(bound_in_);
     bound_out_pub_ .publish(bound_out_);
@@ -327,21 +426,25 @@ void MpccRos::runTestSim()
             msg.pose.pose.orientation.y = q.y;
             msg.pose.pose.orientation.z = q.z;
             msg.pose.pose.orientation.w = q.w;
+            msg.twist.twist.linear.x = x_.vx;
+            msg.twist.twist.linear.y = x_.vy;
+            msg.twist.twist.angular.z = x_.r;
             pose_pub.publish(msg);
 
             publishControl(u_);
             publishTrack();
+            debugSolution();
         }
     }
 }
 }
 
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "mpcc");
+    ros::init(argc, argv, "mpcc_controller_node");
     ros::NodeHandle nhp("~");
     using namespace mpcc;
     std::string config_path;
-    nhp.param("config_path", config_path, std::string("/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc/Params/config.json"));
+    nhp.param("config_path", config_path, std::string("/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/config.json"));
     std::cout << "Openning config at " << config_path << std::endl;
     std::ifstream iConfig(config_path.c_str());
     json jsonConfig;
