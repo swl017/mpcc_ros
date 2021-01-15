@@ -36,7 +36,7 @@ namespace mpcc
 #define NPC 3 //number of polytopic constraints
 #define NS 3
 
-    static constexpr int N = 20;
+    static constexpr int N = 100;
     static constexpr double INF = 1E5;
     static constexpr int N_SPLINE = 5000;
 

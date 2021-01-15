@@ -38,7 +38,7 @@ jsonConfig(config)
     // use_test_sim_ = false;
     Ts_ = jsonConfig["Ts"];
 
-    nhp.param("use_test_sim", use_test_sim_, false);
+    nhp.param("use_test_sim", use_test_sim_, true);
     nhp.param<std::string>("ego_pose_topic", ego_pose_topic_, "sim_pose");
 
     ROS_INFO("use_sim: %s",use_test_sim_ ? "true" : "false");
