@@ -236,6 +236,8 @@ namespace mpcc
 
         //TODO: this is one approach to handle solver errors, works well in simulation
         n_no_solves_sqp_ = 0;
+        int solved_successively = 0;
+        int exit_thres_successively = 4;
         for (int i = 0; i < n_sqp_; i++)
         {
             setMPCProblem();
@@ -243,7 +245,14 @@ namespace mpcc
             optimal_solution_ = solver_interface_->solveMPC(stages_, x0_normalized, &solver_status);
             optimal_solution_ = deNormalizeSolution(optimal_solution_);
             if (solver_status != 0)
+            {
                 n_no_solves_sqp_++;
+                solved_successively = 0;
+            }
+            else
+            {
+                if(++solved_successively > exit_thres_successively) break;
+            }
             if (solver_status <= 1)
                 initial_guess_ = sqpSolutionUpdate(initial_guess_, optimal_solution_);
         }

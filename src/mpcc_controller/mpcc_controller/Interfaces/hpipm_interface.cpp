@@ -251,8 +251,8 @@ std::array<OptVariables,N+1> HpipmInterface::Solve(int *status)
     struct d_ocp_qp_ipm_arg arg;
     d_ocp_qp_ipm_arg_create(&dim, &arg, ipm_arg_mem);
 
-//    enum hpipm_mode mode = SPEED_ABS;
-    enum hpipm_mode mode = SPEED;
+   enum hpipm_mode mode = SPEED_ABS;
+    // enum hpipm_mode mode = SPEED;
 //    enum hpipm_mode mode = BALANCE;
 //    enum hpipm_mode mode = ROBUST;
 

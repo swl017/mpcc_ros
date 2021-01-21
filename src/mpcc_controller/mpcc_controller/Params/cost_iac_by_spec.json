@@ -1,6 +1,6 @@
 
 {
-  "qC" : 0.001,
+  "qC" : 0.01,
   "qL" : 1500.0,
   "qVs" : 0.6,
 
@@ -12,15 +12,15 @@
   "qBeta" : 1E0,
   "betaKin": 1,
 
-  "rD" : 1E-3,
-  "rDelta" : 1E-3,
+  "rD" : 1E-7,
+  "rDelta" : 1E-4,
   "rVs" : 1E-5,
 
-  "rdD" : 1E-1,
+  "rdD" : 1E-5,
   "rdDelta" : 5E3,
   "rdVs" : 1E-4,
 
-  "qCNmult": 5000,
+  "qCNmult": 1000,
   "qRNmult": 10,
 
   "sc_quad_track": 1000.0,

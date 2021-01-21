@@ -23,7 +23,7 @@ Model::Model()
 }
 
 Model::Model(double Ts,const PathToJson &path)
-:Ts_(Ts),param_(Param(path.param_path))
+:Ts_(Ts),param_(Param(path.param_path)),param_o_(Param(path.param_path))
 {
 }
 
@@ -344,11 +344,17 @@ LinModelMatrix Model::discretizeModel(const LinModelMatrix &lin_model_c, const S
 //     return {A_d,B_d,g_d};
 // }
 
-LinModelMatrix Model::getLinModel(const State &x, const Input &u, const State &x_next) const
+LinModelMatrix Model::getLinModel(const State &x, const Input &u, const State &x_next)
 {
+    // updateParam(x,u,x_next);
     // compute linearized and discretized model
     const LinModelMatrix lin_model_c = getModelJacobian(x,u);
     // discretize the system
     return discretizeModel(lin_model_c,x,u,x_next);
+}
+
+void Model::updateParam(const State &x, const Input &u, const State &x_next)
+{
+    param_.Cm1 = x.D > 0 ? 5000 : 4000;
 }
 }

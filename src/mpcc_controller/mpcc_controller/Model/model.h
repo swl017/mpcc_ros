@@ -77,15 +77,17 @@ public:
 
     StateVector getF(const State &x,const Input &u) const;
 
-    LinModelMatrix getLinModel(const State &x, const Input &u,const State &x_next) const;
+    LinModelMatrix getLinModel(const State &x, const Input &u,const State &x_next);
+    void updateParam(const State &x, const Input &u, const State &x_next);
 
     Model();
     Model(double Ts,const PathToJson &path);
+    Param param_;
 private:
     LinModelMatrix getModelJacobian(const State &x, const Input &u) const;
     LinModelMatrix discretizeModel(const LinModelMatrix &lin_model_c,const State &x, const Input &u,const State &x_next) const;
 
-    Param param_;
+    Param param_o_;
     const double Ts_;
 };
 }

@@ -88,8 +88,11 @@ void MpccRos::mpcInit()
     TrackPos track_xy = track.getTrack();
     // mpc.setTrack(track_xy.X,track_xy.Y);
     mpc.setTrack(track_xy.X,track_xy.Y,track_xy.X_inner,track_xy.Y_inner,track_xy.X_outer,track_xy.Y_outer);
-    phi_0 = std::atan2(track_xy.Y(1) - track_xy.Y(0),track_xy.X(1) - track_xy.X(0));
+    // phi_0 = std::atan2(track_xy.Y(304) - track_xy.Y(300),track_xy.X(304) - track_xy.X(300));
+    // x0 = {track_xy.X(300),track_xy.Y(300),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
+    phi_0 = std::atan2(track_xy.Y(4) - track_xy.Y(0),track_xy.X(4) - track_xy.X(0));
     x0 = {track_xy.X(0),track_xy.Y(0),phi_0,jsonConfig["v0"],0,0,0,0.5,0,jsonConfig["v0"]};
+
     
     ////////////////////////////////////////////
     /////// End MPC class initialization ///////
@@ -349,10 +352,11 @@ void MpccRos::publishControl(Input u)
     ackermann_msgs::AckermannDriveStamped msg;
     msg.header.stamp = ros::Time::now();
     // TODO: Need debate
-    msg.drive.acceleration   = x_.D;
     msg.drive.steering_angle = x_.delta;
     msg.drive.steering_angle_velocity = u.dDelta;
     msg.drive.speed          = sqrt(pow(x_.vx, 2.0)+pow(x_.vy, 2.0));
+    msg.drive.acceleration   = x_.D;
+    msg.drive.jerk   = u.dD;
     control_pub_.publish(msg);
 
 }
@@ -402,8 +406,11 @@ void MpccRos::publishTrack()
 void MpccRos::runTestSim()
 {
     Integrator integrator = Integrator(jsonConfig["Ts"],json_paths);
-    for(int i=0;i<jsonConfig["n_sim"];i++)
+    int i = 0;
+    // for(int i=0;i<jsonConfig["n_sim"];i++)
+    while(ros::ok())
     {
+        i++;
         if(ros::ok())
         {
             MPCReturn mpc_sol = mpc.runMPC(x0);

@@ -1,11 +1,11 @@
 
 {
-  "n_sqp": 100,
+  "n_sqp": 500,
   "n_reset": 5,
   "sqp_mixing" : 0.9,
   "n_sim": 60000,
   "Ts": 0.025,
-  "v0": 60,
+  "v0": 20,
   
   "model_path": "/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/model_iac_00_by_spec.json",
   "cost_path": "/home/usrg/catkin_ws/src/mpcc_ros/src/mpcc_controller/mpcc_controller/Params/cost_iac_by_spec.json",
