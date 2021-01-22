@@ -46,7 +46,8 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_subdirectory(src/mpcc)
+add_subdirectory(src/mpcc_controller)
+add_subdirectory(src/tf_publisher)
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}

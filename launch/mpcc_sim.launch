@@ -7,7 +7,12 @@
 
     <node pkg="mpcc_ros" type="mpcc_controller_node" name="mpcc_controller_node" output="screen">
         <param name="config_path" type="string" value="$(find mpcc_ros)/src/mpcc_controller/mpcc_controller/Params/config.json" />
-        <param name="use_test_sim" type="string" value="false" />
+        <param name="use_test_sim" type="string" value="true" />
+        <param name="ego_pose_topic" type="string" value="$(arg ego_pose_topic)" />
+    </node>
+    <node pkg="mpcc_ros" type="tf_publisher" name="tf_publisher" output="screen">
+        <param name="world_frame_id" type="string" value="$(arg world_frame_id)" />
+        <param name="ego_frame_id" type="string" value="$(arg ego_frame_id)" />
         <param name="ego_pose_topic" type="string" value="$(arg ego_pose_topic)" />
     </node>
 </launch>
