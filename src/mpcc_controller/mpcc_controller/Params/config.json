@@ -1,6 +1,6 @@
 
 {
-  "n_sqp": 500,
+  "n_sqp": 200,
   "n_reset": 5,
   "sqp_mixing" : 0.9,
   "n_sim": 60000,
